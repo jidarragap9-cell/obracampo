@@ -1,0 +1,30 @@
+/* Service worker: guarda la app en caché para que abra sin internet y se actualice en segundo plano. */
+const VERSION = 'obracampo-v2';
+const ARCHIVOS = [
+  './', 'index.html', 'manifest.webmanifest', 'css/app.css',
+  'js/db.js', 'js/ui.js', 'js/calc.js', 'js/bitacora.js', 'js/report.js', 'js/precios.js', 'js/presupuesto.js', 'js/app.js', 'icons/icon.svg',
+];
+const OPCIONALES = ['icons/icon-192.png', 'icons/icon-512.png'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(VERSION)
+    .then(c => c.addAll(ARCHIVOS).then(() => Promise.allSettled(OPCIONALES.map(a => c.add(a)))))
+    .then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys()
+    .then(claves => Promise.all(claves.filter(k => k !== VERSION).map(k => caches.delete(k))))
+    .then(() => self.clients.claim()));
+});
+
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
+  e.respondWith(caches.open(VERSION).then(async cache => {
+    const enCache = await cache.match(e.request, { ignoreSearch: true });
+    const red = fetch(e.request)
+      .then(r => { if (r.ok) cache.put(e.request, r.clone()); return r; })
+      .catch(() => enCache);
+    return enCache || red;
+  }));
+});
