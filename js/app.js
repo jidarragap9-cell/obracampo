@@ -220,7 +220,9 @@ const App = (() => {
         <p class="sub" style="margin-top:12px">${est ? `Espacio usado: ${num(est.usage / 1048576, 1)} MB de ${num(est.quota / 1073741824, 1)} GB disponibles. ` : ''}
           Almacenamiento persistente: ${persistente ? 'activado ✓' : 'no confirmado (instale la app para activarlo)'}.</p></section>
       <section class="card"><h2>Instalar en la tablet</h2><p class="sub">En Chrome abra el menú ⋮ y elija <b>Agregar a la pantalla principal</b> o <b>Instalar app</b>.
-        Quedará como una aplicación más y funcionará sin conexión.</p></section>`;
+        Quedará como una aplicación más y funcionará sin conexión.</p></section>
+      <section class="card"><h2>Actualizar la app</h2><p class="sub">Si después de publicar una versión nueva algo no abre, fuerce la actualización. Sus datos no se borran.</p>
+        <div class="acciones"><a class="btn" href="actualizar.html">⟳ Forzar actualización</a></div></section>`;
 
     raiz.addEventListener('input', ev => {
       const k = ev.target.dataset.k;
@@ -256,7 +258,16 @@ const App = (() => {
   /* ---------- Arranque ---------- */
   window.addEventListener('hashchange', enrutar);
   enrutar();
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(console.warn);
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    // Cuando se instala una versión nueva, se recarga sola (salvo en el editor de planos, para no interrumpir el dibujo).
+    const habiaVersion = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!habiaVersion) return;
+      if (document.body.classList.contains('modo-editor')) toast('Hay una versión nueva de ObraCampo: se aplicará al salir del plano', 'ok');
+      else location.reload();
+    });
+    navigator.serviceWorker.register('sw.js').catch(console.warn);
+  }
   navigator.storage?.persist?.();
 
   return { enrutar };
