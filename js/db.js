@@ -1,8 +1,8 @@
 /* Almacenamiento local (IndexedDB). Todos los datos quedan en la tablet y funcionan sin internet. */
 const DB = (() => {
   const NOMBRE = 'obracampo';
-  const VERSION = 2;
-  const ALMACENES = ['proyectos', 'bitacora', 'fotos', 'cantidades', 'ajustes', 'insumos', 'apus', 'presupuestos'];
+  const VERSION = 3;
+  const ALMACENES = ['proyectos', 'bitacora', 'fotos', 'cantidades', 'ajustes', 'insumos', 'apus', 'presupuestos', 'planos'];
   let conexion = null;
 
   function abrir() {
@@ -25,6 +25,8 @@ const DB = (() => {
         crear('insumos', 'id');
         crear('apus', 'id');
         crear('presupuestos', 'proyectoId');
+        // Versión 3: planos dibujados
+        crear('planos', 'id', ['proyecto', 'proyectoId']);
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
@@ -69,13 +71,15 @@ const DB = (() => {
       });
     },
 
-    /* Borra el proyecto completo: bitácora, fotos y cantidades. */
+    /* Borra el proyecto completo: bitácora, fotos, cantidades, presupuesto y planos. */
     async borrarProyecto(pid) {
       const registros = await this.porProyecto('bitacora', pid);
       const cantidades = await this.porProyecto('cantidades', pid);
+      const planos = await this.porProyecto('planos', pid);
       for (const r of registros) await this.borrarRegistro(r.id);
-      return operacion(['proyectos', 'cantidades', 'presupuestos'], 'readwrite', tx => {
+      return operacion(['proyectos', 'cantidades', 'presupuestos', 'planos'], 'readwrite', tx => {
         cantidades.forEach(c => tx.objectStore('cantidades').delete(c.id));
+        planos.forEach(p => tx.objectStore('planos').delete(p.id));
         tx.objectStore('presupuestos').delete(pid);
         tx.objectStore('proyectos').delete(pid);
       });

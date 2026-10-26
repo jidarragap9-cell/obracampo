@@ -27,6 +27,9 @@ const App = (() => {
     [/^#\/precios\/apu$/, () => Precios.vistaAPUs(nuevaRaiz())],
     [/^#\/apu\/(\w+)$/, id => Precios.editorAPU(nuevaRaiz(), id)],
     [/^#\/ajustes$/, () => vistaAjustes()],
+    [/^#\/planos$/, () => Planos.lista(nuevaRaiz())],
+    [/^#\/plano\/(\w+)$/, id => Planos.editor(nuevaRaiz(), id)],
+    [/^#\/contencion$/, () => Contencion.vista(nuevaRaiz())],
   ];
 
   async function enrutar() {
@@ -36,7 +39,8 @@ const App = (() => {
       const m = h.match(re);
       if (!m) continue;
       const seccion = h.startsWith('#/calc') ? 'calc' : h.startsWith('#/ajustes') ? 'ajustes'
-        : h.startsWith('#/precios') || h.startsWith('#/apu') ? 'precios' : 'proyectos';
+        : h.startsWith('#/precios') || h.startsWith('#/apu') ? 'precios'
+        : h.startsWith('#/plano') || h.startsWith('#/contencion') ? 'planos' : 'proyectos';
       document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('activo', a.dataset.nav === seccion));
       window.scrollTo(0, 0);
       try { await fn(...m.slice(1)); }
@@ -127,11 +131,12 @@ const App = (() => {
     raiz.innerHTML = `<div class="cabecera"><a class="volver" href="#/">← Proyectos</a><h1>${esc(p.nombre)}</h1>
         <p class="sub">${esc([p.ubicacion, p.contrato && 'Contrato ' + p.contrato].filter(Boolean).join(' · '))}</p>
         ${t ? `<div class="barra"><i style="width:${t.pct}%"></i></div><p class="sub">Día ${t.dias} de ${t.plazo} · ${num(t.pct, 0)} % del plazo transcurrido</p>` : ''}</div>
-      <nav class="tabs">${[['bitacora', '📒 Bitácora'], ['cantidades', '🧮 Cantidades'], ['presupuesto', '💲 Presupuesto'], ['datos', '📋 Datos del proyecto']]
+      <nav class="tabs">${[['bitacora', '📒 Bitácora'], ['planos', '📐 Planos'], ['cantidades', '🧮 Cantidades'], ['presupuesto', '💲 Presupuesto'], ['datos', '📋 Datos del proyecto']]
         .map(([k, l]) => `<a href="#/proyecto/${id}/${k}" class="${k === tab ? 'activo' : ''}">${l}</a>`).join('')}</nav><div id="tab"></div>`;
     const cont = $('#tab', raiz);
     if (tab === 'cantidades') return tabCantidades(cont, p);
     if (tab === 'presupuesto') return Presupuesto.tab(cont, p);
+    if (tab === 'planos') return Planos.tab(cont, p);
     if (tab === 'datos') return tabDatos(cont, p);
     return tabBitacora(cont, p);
   }

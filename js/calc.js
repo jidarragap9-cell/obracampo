@@ -422,5 +422,5 @@ const Calc = (() => {
     });
   }
 
-  return { DEF, porId, lista, vista, tarjetasHTML, resultadoHTML, entradasHTML, valorTexto };
+  return { DEF, porId, lista, vista, tarjetasHTML, resultadoHTML, entradasHTML, valorTexto, CONCRETOS, MORTEROS, BARRAS, BULTO };
 })();
