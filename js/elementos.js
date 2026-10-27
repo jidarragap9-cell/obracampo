@@ -44,14 +44,62 @@ const Elementos = (() => {
     { id: 'puerta', t: 'Puertas', pre: 'P', color: '#2f6b3a' },
     { id: 'ventana', t: 'Ventanas', pre: 'V', color: '#1f8fb8' },
     { id: 'cubierta', t: 'Cubierta', pre: 'CUB', color: '#8e44ad' },
+    { id: 'generico', t: 'Elementos personalizados', pre: 'EP', color: '#0e7c86' },
     { id: 'bloque', t: 'Bloques', pre: 'B', color: '#2e7d32' },
     { id: 'cota', t: 'Cotas', pre: '', color: '#333' },
   ];
   const capa = id => CAPAS.find(c => c.id === id);
   const NOMBRE_TIPO = {
     muro: 'Muro', columna: 'Columna', viga: 'Viga aérea', vigaCim: 'Viga de cimentación', zapata: 'Zapata',
-    puerta: 'Puerta', ventana: 'Ventana', cubierta: 'Cubierta', bloque: 'Bloque', cota: 'Cota',
+    puerta: 'Puerta', ventana: 'Ventana', cubierta: 'Cubierta', bloque: 'Bloque', cota: 'Cota', generico: 'Elemento',
   };
+
+  // Perfiles metálicos y de madera para la estructura de cubierta. Medidas en mm; peso por geometría (acero 7850 kg/m³).
+  // Valores de referencia: confirme dimensiones y pesos con la ficha del fabricante.
+  const CALIBRES = { 12: 2.5, 14: 1.9, 16: 1.5, 18: 1.2, 20: 0.9 };
+  const PERFILES = {
+    phrC: { t: 'Perfil PHR C (lámina doblada)', corto: 'PHR C', cal: true, largo: 6,
+      medidas: { '60x40': { h: 60, b: 40, c: 10 }, '100x50': { h: 100, b: 50, c: 15 }, '120x60': { h: 120, b: 60, c: 15 }, '150x50': { h: 150, b: 50, c: 15 },
+        '160x60': { h: 160, b: 60, c: 20 }, '200x70': { h: 200, b: 70, c: 20 }, '220x80': { h: 220, b: 80, c: 20 } },
+      kg: (m, t) => (m.h + 2 * m.b + 2 * m.c) * t * 7.85e-3 },
+    tubo: { t: 'Tubular estructural (cuadrado o rectangular)', corto: 'Tubular', cal: true, largo: 6,
+      medidas: { '40x40': { h: 40, b: 40 }, '50x50': { h: 50, b: 50 }, '60x40': { h: 60, b: 40 }, '70x50': { h: 70, b: 50 }, '80x40': { h: 80, b: 40 },
+        '90x90': { h: 90, b: 90 }, '100x50': { h: 100, b: 50 }, '100x100': { h: 100, b: 100 } },
+      kg: (m, t) => (2 * (m.h + m.b) - 4 * t) * t * 7.85e-3 },
+    angulo: { t: 'Ángulo de lados iguales (L)', corto: 'Ángulo', cal: false, largo: 6,
+      medidas: { '1x1/8': { h: 25.4, b: 25.4, e: 3.175, txt: '1" × 1/8"' }, '1 1/4x1/8': { h: 31.75, b: 31.75, e: 3.175, txt: '1 1/4" × 1/8"' },
+        '1 1/2x1/8': { h: 38.1, b: 38.1, e: 3.175, txt: '1 1/2" × 1/8"' }, '1 1/2x3/16': { h: 38.1, b: 38.1, e: 4.76, txt: '1 1/2" × 3/16"' },
+        '2x1/8': { h: 50.8, b: 50.8, e: 3.175, txt: '2" × 1/8"' }, '2x3/16': { h: 50.8, b: 50.8, e: 4.76, txt: '2" × 3/16"' }, '2x1/4': { h: 50.8, b: 50.8, e: 6.35, txt: '2" × 1/4"' } },
+      kg: m => (2 * m.b - m.e) * m.e * 7.85e-3 },
+    madera: { t: 'Madera aserrada (listón o viga)', corto: 'Madera', cal: false, largo: 3, madera: true,
+      medidas: { '2x3': { h: 76, b: 51, txt: '2" × 3"' }, '2x4': { h: 102, b: 51, txt: '2" × 4"' }, '3x4': { h: 102, b: 76, txt: '3" × 4"' },
+        '3x6': { h: 152, b: 76, txt: '3" × 6"' }, '4x4': { h: 102, b: 102, txt: '4" × 4"' } },
+      kg: () => 0 },
+  };
+  // Descripción, peso por metro, sección (m) y largo comercial de un perfil elegido.
+  function perfilInfo(tipo, medida, cal) {
+    const P = PERFILES[tipo] || PERFILES.phrC;
+    const m = P.medidas[medida] || Object.values(P.medidas)[0];
+    const clave = P.medidas[medida] ? medida : Object.keys(P.medidas)[0];
+    const t = CALIBRES[cal] || CALIBRES[16];
+    const nombre = `${P.corto} ${m.txt || clave.replace('x', ' × ')}${P.cal ? ` cal. ${CALIBRES[cal] ? cal : 16}` : ''}`;
+    return { P, m, nombre, kgm: P.kg(m, t), h: m.h / 1000, b: m.b / 1000, largo: P.largo, madera: !!P.madera };
+  }
+  const opcionesPerfil = () => Object.entries(PERFILES).map(([k, p]) => [k, p.t]);
+  const opcionesMedida = tipo => Object.entries((PERFILES[tipo] || PERFILES.phrC).medidas).map(([k, m]) => [k, m.txt || k.replace('x', ' × ') + ' mm']);
+  const opcionesCalibre = () => Object.entries(CALIBRES).map(([k, t]) => [k, `Cal. ${k} (${num(t, 1)} mm)`]);
+  // Ajusta medida y calibre cuando cambia el tipo de perfil.
+  function normalizarCubierta(c) {
+    for (const pre of ['correa', 'cordon', 'celosia']) {
+      const P = PERFILES[c[pre + 'Perfil']];
+      if (!P) continue;
+      if (!P.medidas[c[pre + 'Medida']]) c[pre + 'Medida'] = Object.keys(P.medidas)[P === PERFILES.phrC ? 1 : 0];
+      if (!CALIBRES[c[pre + 'Cal']]) c[pre + 'Cal'] = '16';
+    }
+    return c;
+  }
+  const COLORES = [['#0e7c86', 'Verde azulado'], ['#1f5fa8', 'Azul'], ['#2e7d32', 'Verde'], ['#c9a227', 'Amarillo'], ['#e67e22', 'Naranja'],
+    ['#c0392b', 'Rojo'], ['#8e44ad', 'Morado'], ['#8a6d3b', 'Café'], ['#9c9b96', 'Gris concreto'], ['#f2f2ee', 'Blanco']];
 
   // Propiedades por defecto de cada elemento nuevo.
   const PLANTILLAS = {
@@ -62,7 +110,10 @@ const Elementos = (() => {
     zapata: { B: 1.0, L: 1.0, h: 0.30, prof: 1.20 },
     puerta: { ancho: 0.90, alto: 2.10, estilo: 'batiente', giro: 'izq', lado: 1 },
     ventana: { ancho: 1.20, alto: 1.00, antepecho: 1.00 },
-    cubierta: { alero: 0.60, forma: 'dos', dir: 'y', pendiente: 20, teja: 'zinc', apoyo: 'muros', sepCerchas: 3.0 },
+    cubierta: { alero: 0.60, forma: 'dos', dir: 'y', pendiente: 20, teja: 'zinc', apoyo: 'muros', sepCerchas: 3.0,
+      correaPerfil: 'phrC', correaMedida: '100x50', correaCal: '16',
+      cordonPerfil: 'tubo', cordonMedida: '60x40', cordonCal: '16', celosiaPerfil: 'angulo', celosiaMedida: '1x1/8', celosiaCal: '16' },
+    generico: { nombre: 'Elemento', L: 1.0, A: 1.0, H: 1.0, z: 0, ang: 0, color: '#0e7c86', medida: 'un', material: '' },
     bloque: { simbolo: 'arbol', escala: 1, ang: 0 },
     cota: { off: 0.5 },
   };
@@ -146,6 +197,30 @@ const Elementos = (() => {
   }
 
   const espesorMuro = m => (MAMPOSTERIA[m.unidad] || MAMPOSTERIA.h10).e;
+  // Prolongación de cada extremo del muro hasta la cara del muro con el que se une (esquinas limpias).
+  function extremosMuro(m, muros) {
+    const ext = p => {
+      let e = 0;
+      for (const o of muros) {
+        if (o === m) continue;
+        if (dist(p, o.a) < 0.02 || dist(p, o.b) < 0.02 || proyectar(p, o.a, o.b).d < 0.02) e = Math.max(e, espesorMuro(o) / 2);
+      }
+      return e;
+    };
+    return [ext(m.a), ext(m.b)];
+  }
+  // Tramos [s0, s1] de un elemento lineal que no quedan dentro de columnas (para no sobreponer volúmenes).
+  function tramosLibres(L, ocupados, extA = 0, extB = 0) {
+    const cortes = ocupados.map(o => [Math.max(-extA, o.s - o.traslapo / 2), Math.min(L + extB, o.s + o.traslapo / 2)]).sort((a, b) => a[0] - b[0]);
+    const libres = [];
+    let s = -extA;
+    for (const [a, b] of cortes) {
+      if (a - s > 1e-3) libres.push([s, a]);
+      s = Math.max(s, b);
+    }
+    if (L + extB - s > 1e-3) libres.push([s, L + extB]);
+    return libres;
+  }
 
   /* ---------- Contexto de cálculo ---------- */
   function contexto(plano) {
@@ -168,7 +243,7 @@ const Elementos = (() => {
           const across = Math.abs(Math.sin(dAng)) * c.b + Math.abs(Math.cos(dAng)) * c.h;
           if (pr.d > across / 2 + 0.01) return null;
           const ini = Math.max(0, pr.s - along / 2), fin = Math.min(L, pr.s + along / 2);
-          return fin > ini ? { c, s: pr.s, traslapo: fin - ini } : null;
+          return fin > ini ? { c, s: pr.s, traslapo: fin - ini, along } : null;
         }).filter(Boolean).sort((p, q) => p.s - q.s);
       },
       alturaApoyo() {
@@ -368,26 +443,71 @@ const Elementos = (() => {
     return { filas: mejor.filas, piezas: Object.entries(piezas).map(([L, c]) => ({ L: +L, nombre: nombre(+L), c })) };
   }
 
-  function cercha(S, f, dos, alero, k) {
-    const paneles = Math.max(2, 2 * Math.ceil(S / 2 / 1.0 - 1e-9)), a = S / paneles;
+  const datosCubierta = el => normalizarCubierta({ ...PLANTILLAS.cubierta, ...el });
+
+  // Barras de una cercha en su plano: x desde el apoyo inicial (0) hasta S, z sobre el apoyo. Incluye el alero en el cordón superior.
+  function cerchaGeom(S, f, dos, alero) {
+    const paneles = dos ? Math.max(2, 2 * Math.ceil(S / 2 / 1.0 - 1e-9)) : Math.max(2, Math.ceil(S / 1.0 - 1e-9)), a = S / paneles;
     const alt = x => (dos ? f * (1 - Math.abs(x - S / 2) / (S / 2)) : f * (1 - x / S));
-    let mont = dos ? 0 : f, diag = 0;
-    for (let i = 1; i < paneles; i++) mont += alt(i * a);
-    for (let i = 0; i < paneles; i++) diag += Math.hypot(a, Math.max(alt(i * a), alt((i + 1) * a)));
-    const sup = (dos ? 2 * Math.hypot(S / 2, f) : Math.hypot(S, f)) + 2 * alero * k;
-    return { paneles, sup, inf: S, mont, diag, total: sup + S + mont + diag };
+    const b = [];
+    const barra = (x1, z1, x2, z2, tipo) => b.push({ x1, z1, x2, z2, tipo, L: Math.hypot(x2 - x1, z2 - z1) });
+    if (dos) { barra(-alero, alt(-alero), S / 2, f, 'cordon'); barra(S / 2, f, S + alero, alt(S + alero), 'cordon'); }
+    else barra(-alero, alt(-alero), S + alero, alt(S + alero), 'cordon');
+    barra(0, 0, S, 0, 'cordon');
+    for (let i = dos ? 1 : 0; i < paneles; i++) if (alt(i * a) > 0.02) barra(i * a, 0, i * a, alt(i * a), 'celosia');
+    for (let i = 0; i < paneles; i++) {
+      const x0 = i * a, x1 = (i + 1) * a;
+      if (dos && i < paneles / 2 && i > 0) barra(x0, alt(x0), x1, 0, 'celosia');
+      else if (dos && i >= paneles / 2 && i < paneles - 1) barra(x1, alt(x1), x0, 0, 'celosia');
+      else if (!dos && i < paneles - 1) barra(x0, alt(x0), x1, 0, 'celosia');
+    }
+    const suma = t => b.filter(x => x.tipo === t).reduce((s, x) => s + x.L, 0);
+    return { paneles, barras: b, cordon: suma('cordon'), celosia: suma('celosia'), total: suma('cordon') + suma('celosia') };
+  }
+
+  // Geometría común de la cubierta: ejes, alturas y posición de correas y cerchas.
+  function geomCubierta(el, z0 = 0) {
+    const c = datosCubierta(el), ap = el.puntos, cont = desfasar(ap, +c.alero || 0);
+    const p = (+c.pendiente || 0) / 100, ba = caja(ap), bb = caja(cont), ejeX = c.dir === 'x', dos = c.forma === 'dos';
+    const [s0, s1, w0, w1] = ejeX ? [ba.x0, ba.x1, ba.y0, ba.y1] : [ba.y0, ba.y1, ba.x0, ba.x1];
+    const [e0, e1, v0, v1] = ejeX ? [bb.x0, bb.x1, bb.y0, bb.y1] : [bb.y0, bb.y1, bb.x0, bb.x1];
+    const mid = (s0 + s1) / 2, half = (s1 - s0) / 2;
+    const z = dos ? s => z0 + p * (half - Math.abs(s - mid)) : s => z0 + p * (s1 - s);
+    const P = (s, w, zz) => (ejeX ? { x: s, y: w, z: zz } : { x: w, y: s, z: zz });
+    return { c, cont, p, k: Math.sqrt(1 + p * p), ejeX, dos, s0, s1, w0, w1, e0, e1, v0, v1, mid, half, z, P, S: s1 - s0, f: dos ? p * half : p * (s1 - s0) };
+  }
+
+  // Ejes de correas (por agua) y de cerchas, en planta y con su cota z en la cara inferior de la teja.
+  function estructuraCubierta(el, z0 = 0) {
+    const G = geomCubierta(el, z0), { c } = G;
+    const sep = +c.sep || (TEJAS[c.teja] || TEJAS.zinc).sep;
+    const tramos = G.dos ? [[G.e0, G.mid], [G.mid, G.e1]] : [[G.e0, G.e1]];
+    const correas = [];
+    for (const [a, b] of tramos) {
+      const n = Math.ceil(Math.abs(b - a) * G.k / sep - 1e-9) + 1;
+      for (let i = 0; i < n; i++) {
+        const s = a + (b - a) * i / (n - 1);
+        correas.push({ s, a: G.P(s, G.v0, G.z(s)), b: G.P(s, G.v1, G.z(s)) });
+      }
+    }
+    const cerchas = [];
+    if (c.apoyo === 'cerchas') {
+      const geo = cerchaGeom(G.S, G.f, G.dos, +c.alero || 0);
+      const n = Math.max(2, Math.ceil((G.w1 - G.w0) / (+c.sepCerchas || 3) - 1e-9) + 1);
+      for (let i = 0; i < n; i++) {
+        const w = G.w0 + (G.w1 - G.w0) * i / (n - 1);
+        cerchas.push({ w, barras: geo.barras.map(x => ({ tipo: x.tipo, a: G.P(G.s0 + x.x1, w, z0 + x.z1), b: G.P(G.s0 + x.x2, w, z0 + x.z2) })) });
+      }
+    }
+    return { G, correas, cerchas };
   }
 
   function cubiertaInfo(el) {
-    const teja = TEJAS[el.teja] || TEJAS.zinc;
-    const util = +el.util || teja.util, tras = +el.traslapo || teja.traslapo, sep = +el.sep || teja.sep;
-    const ap = el.puntos, cont = desfasar(ap, +el.alero || 0);
-    const p = (+el.pendiente || 0) / 100, k = Math.sqrt(1 + p * p);
-    const bb = caja(cont), ba = caja(ap);
-    const ejeX = el.dir === 'x';
-    const extS = ejeX ? bb.w : bb.h, extW = ejeX ? bb.h : bb.w;
-    const S = ejeX ? ba.w : ba.h, Wap = ejeX ? ba.h : ba.w;
-    const dos = el.forma === 'dos', aguas = dos ? 2 : 1;
+    const G = geomCubierta(el), d = G.c;
+    const teja = TEJAS[d.teja] || TEJAS.zinc;
+    const util = +d.util || teja.util, tras = +d.traslapo || teja.traslapo, sep = +d.sep || teja.sep;
+    const { cont, p, k, dos } = G;
+    const extS = G.e1 - G.e0, extW = G.v1 - G.v0, aguas = dos ? 2 : 1;
     const Ls = extS / aguas * k;
     const areaPlan = Math.abs(areaFirmada(cont)), areaReal = areaPlan * k;
     const columnas = Math.max(1, Math.ceil((extW - (teja.ancho - util)) / util - 1e-9));
@@ -395,34 +515,42 @@ const Elementos = (() => {
     const tejas = comb.piezas.map(x => ({ ...x, total: x.c * columnas * aguas }));
     const nCorreas = Math.ceil(Ls / sep - 1e-9) + 1;
     const correasMl = nCorreas * aguas * extW;
-    const f = dos ? p * S / 2 : p * S;
+    const pc = perfilInfo(d.correaPerfil, d.correaMedida, d.correaCal);
+    const piezas = (ml, pf) => Math.ceil(ml * 1.05 / pf.largo - 1e-9);
     const res = {
       teja, util, tras, sep, cont, p, k, areaPlan, areaReal, aguas, Ls, extW, columnas, comb, tejas,
       totalTejas: tejas.reduce((s, x) => s + x.total, 0),
-      nCorreas: nCorreas * aguas, correasMl, correas6: Math.ceil(correasMl * 1.05 / 6 - 1e-9),
+      nCorreas: nCorreas * aguas, correasMl, perfilCorrea: pc, correasPiezas: piezas(correasMl, pc), correasKg: correasMl * pc.kgm,
       caballetes: dos ? columnas : 0,
       fijaciones: columnas * aguas * nCorreas * 2,
-      S, f, flecha: f,
+      S: G.S, f: G.f, flecha: G.f,
     };
-    if (el.apoyo === 'cerchas') {
-      const c = cercha(S, f, dos, +el.alero || 0, k);
-      const n = Math.ceil(Wap / (+el.sepCerchas || 3) - 1e-9) + 1;
-      res.cerchas = { ...c, n, ml: c.total * n };
+    res.correas6 = res.correasPiezas;
+    if (d.apoyo === 'cerchas') {
+      const geo = cerchaGeom(G.S, G.f, dos, +d.alero || 0);
+      const n = Math.max(2, Math.ceil((G.w1 - G.w0) / (+d.sepCerchas || 3) - 1e-9) + 1);
+      const pco = perfilInfo(d.cordonPerfil, d.cordonMedida, d.cordonCal), pce = perfilInfo(d.celosiaPerfil, d.celosiaMedida, d.celosiaCal);
+      res.cerchas = {
+        ...geo, n, ml: geo.total * n, perfilCordon: pco, perfilCelosia: pce,
+        cordonMl: geo.cordon * n, celosiaMl: geo.celosia * n,
+        cordonPiezas: piezas(geo.cordon * n, pco), celosiaPiezas: piezas(geo.celosia * n, pce),
+        kg: geo.cordon * n * pco.kgm + geo.celosia * n * pce.kgm,
+        platinas: 2 * n,
+      };
+      res.uniones = n * res.nCorreas;
     } else {
-      res.culatas = S * f; // dos triángulos de base S y altura f, en cualquiera de las dos formas
+      res.culatas = G.S * G.f; // dos triángulos de base S y altura f, en cualquiera de las dos formas
+      res.uniones = res.nCorreas * 2;
     }
+    res.kgEstructura = res.correasKg + (res.cerchas?.kg || 0);
     return res;
   }
 
   // Planos inclinados de la cubierta para la vista 3D: polígonos con la cota z de cada vértice.
   function planosCubierta(el, z0) {
-    const ap = el.puntos, cont = desfasar(ap, +el.alero || 0);
-    const p = (+el.pendiente || 0) / 100, ba = caja(ap);
-    const eje = el.dir === 'x' ? 'x' : 'y';
-    const s0 = eje === 'x' ? ba.x0 : ba.y0, s1 = eje === 'x' ? ba.x1 : ba.y1, mid = (s0 + s1) / 2, half = (s1 - s0) / 2;
-    const z = el.forma === 'dos' ? s => z0 + p * (half - Math.abs(s - mid)) : s => z0 + p * (s1 - s);
-    const polis = el.forma === 'dos' ? [recortar(cont, eje, mid, true), recortar(cont, eje, mid, false)] : [cont];
-    return polis.filter(q => q.length >= 3).map(q => q.map(pt => ({ x: pt.x, y: pt.y, z: z(pt[eje]) })));
+    const G = geomCubierta(el, z0), eje = G.ejeX ? 'x' : 'y';
+    const polis = G.dos ? [recortar(G.cont, eje, G.mid, true), recortar(G.cont, eje, G.mid, false)] : [G.cont];
+    return polis.filter(q => q.length >= 3).map(q => q.map(pt => ({ x: pt.x, y: pt.y, z: G.z(pt[eje]) })));
   }
 
   /* ---------- Cantidades del plano ---------- */
@@ -431,7 +559,7 @@ const Elementos = (() => {
     const etq = etiquetas(plano);
     const kC = 1 + cfg.despConcreto / 100, kA = 1 + cfg.despAcero / 100;
     const secciones = [];
-    const mat = { cemento: 0, arena: 0, grava: 0, agua: 0, unidades: {}, acero: {}, alambre: 0 };
+    const mat = { cemento: 0, arena: 0, grava: 0, agua: 0, unidades: {}, acero: {}, alambre: 0, perfiles: {}, otros: [] };
     const concretoPor = {};
     const sumarConcreto = (vol, dos) => { concretoPor[dos] = (concretoPor[dos] || 0) + vol; };
 
@@ -573,17 +701,25 @@ const Elementos = (() => {
         ['Longitud inclinada por agua', c.Ls, 'm'],
         ...c.tejas.map(t => [`Teja ${c.teja.t} — ${t.nombre}`, t.total, 'un']),
         ['Correas (líneas de ' + num(c.extW, 2) + ' m, separación ≤ ' + num(c.sep, 2) + ' m)', c.nCorreas, 'un'],
-        ['Correas — longitud total', c.correasMl, 'm'],
-        ['Correas — perfiles de 6 m (5 % desperdicio)', c.correas6, 'un'],
+        [`Correas ${c.perfilCorrea.nombre} — longitud total`, c.correasMl, 'm'],
+        [`Correas ${c.perfilCorrea.nombre} — piezas de ${c.perfilCorrea.largo} m (5 % desperdicio)`, c.correasPiezas, 'un'],
+        ...(c.correasKg ? [['Correas — peso', c.correasKg, 'kg']] : []),
         ...(c.caballetes ? [['Caballetes', c.caballetes, 'un']] : []),
-        ['Ganchos o tornillos de fijación (aprox.)', c.fijaciones, 'un'],
+        ['Ganchos o tornillos de fijación de teja (aprox.)', c.fijaciones, 'un'],
         ['Altura de cumbrera sobre el apoyo', c.f, 'm'],
       ];
       if (c.cerchas) {
-        filas.push(['Cerchas metálicas (separación ' + num(cub.sepCerchas, 2) + ' m)', c.cerchas.n, 'un']);
-        filas.push(['Perfil por cercha (cordones, montantes y diagonales)', c.cerchas.total, 'm']);
-        filas.push(['Perfil total de cerchas', c.cerchas.ml, 'm']);
+        const ch = c.cerchas, d = datosCubierta(cub);
+        filas.push([`Cerchas metálicas (separación ≤ ${num(+d.sepCerchas, 2)} m, ${ch.paneles} paneles)`, ch.n, 'un']);
+        filas.push([`Cordones ${ch.perfilCordon.nombre} — longitud total`, ch.cordonMl, 'm']);
+        filas.push([`Cordones ${ch.perfilCordon.nombre} — piezas de ${ch.perfilCordon.largo} m`, ch.cordonPiezas, 'un']);
+        filas.push([`Celosía ${ch.perfilCelosia.nombre} — longitud total`, ch.celosiaMl, 'm']);
+        filas.push([`Celosía ${ch.perfilCelosia.nombre} — piezas de ${ch.perfilCelosia.largo} m`, ch.celosiaPiezas, 'un']);
+        if (ch.kg) filas.push(['Cerchas — peso', ch.kg, 'kg']);
+        filas.push(['Platinas de anclaje con pernos (2 por cercha)', ch.platinas, 'un']);
+        filas.push(['Uniones correa–cercha (soldadura o tornillo)', c.uniones, 'un']);
       } else filas.push(['Culatas en mampostería (triángulos de apoyo)', c.culatas, 'm²']);
+      if (c.kgEstructura) filas.push(['Acero total de la estructura de cubierta', c.kgEstructura, 'kg']);
       secciones.push({
         id: 'cubierta', titulo: `Cubierta ${etq.get(cub.id)} — ${cub.forma === 'dos' ? 'dos aguas' : 'una agua'}`,
         cols: [['Concepto'], ['Cantidad', 'a'], ['Unidad']], filas,
@@ -591,7 +727,30 @@ const Elementos = (() => {
           'Confirme ancho útil, traslapos y separación de correas con la ficha técnica del fabricante.'],
       });
       mat.tejas = (mat.tejas || []).concat(c.tejas.map(t => ({ t: `Teja ${c.teja.t} — ${t.nombre}`, n: t.total })));
-      mat.correas = (mat.correas || 0) + c.correas6;
+      if (c.caballetes) mat.caballetes = (mat.caballetes || 0) + c.caballetes;
+      mat.fijaciones = (mat.fijaciones || 0) + c.fijaciones;
+      const perfil = (pf, piezas) => { const k = `${pf.nombre} — piezas de ${pf.largo} m`; mat.perfiles[k] = (mat.perfiles[k] || 0) + piezas; };
+      perfil(c.perfilCorrea, c.correasPiezas);
+      if (c.cerchas) { perfil(c.cerchas.perfilCordon, c.cerchas.cordonPiezas); perfil(c.cerchas.perfilCelosia, c.cerchas.celosiaPiezas); }
+      mat.kgCubierta = (mat.kgCubierta || 0) + c.kgEstructura;
+    }
+
+    // Elementos personalizados
+    const genericos = ctx.de('generico');
+    if (genericos.length) {
+      const cant = g => ({ un: 1, m: +g.L, 'm²': g.L * g.A, 'm³': g.L * g.A * g.H }[g.medida || 'un'] ?? 1);
+      const grupos = {};
+      for (const g of genericos) {
+        const k = `${g.nombre || 'Elemento'}|${g.medida || 'un'}|${g.material || ''}`;
+        (grupos[k] = grupos[k] || { g, n: 0, q: 0, etq: [] });
+        grupos[k].n++; grupos[k].q += cant(g); grupos[k].etq.push(etq.get(g.id));
+      }
+      secciones.push({
+        id: 'genericos', titulo: 'Elementos personalizados',
+        cols: [['Elemento'], ['Material o descripción'], ['Etiquetas'], ['Cant. elementos', 0], ['Cantidad', 'a'], ['Unidad']],
+        filas: Object.values(grupos).map(x => [x.g.nombre || 'Elemento', x.g.material || '', x.etq.join(', '), x.n, x.q, x.g.medida || 'un']),
+      });
+      for (const x of Object.values(grupos)) mat.otros.push([`${x.g.nombre || 'Elemento'}${x.g.material ? ` (${x.g.material})` : ''}`, x.q, x.g.medida || 'un']);
     }
 
     // Carpintería
@@ -614,7 +773,11 @@ const Elementos = (() => {
     if (mat.kgAcero) filasM.push(['Acero total', mat.kgAcero, 'kg']);
     if (mat.alambre) filasM.push(['Alambre negro #18', mat.alambre, 'kg']);
     for (const t of mat.tejas || []) filasM.push([t.t, t.n, 'un']);
-    if (mat.correas) filasM.push(['Correas metálicas (perfiles de 6 m)', mat.correas, 'un']);
+    if (mat.caballetes) filasM.push(['Caballetes', mat.caballetes, 'un']);
+    for (const [k, v] of Object.entries(mat.perfiles)) filasM.push([`Perfil ${k}`, v, 'un']);
+    if (mat.kgCubierta) filasM.push(['Acero de estructura de cubierta', mat.kgCubierta, 'kg']);
+    if (mat.fijaciones) filasM.push(['Ganchos o tornillos para teja', mat.fijaciones, 'un']);
+    for (const o of mat.otros) filasM.push(o);
     if (mat.agua) filasM.push(['Agua', mat.agua, 'L']);
     if (filasM.length) secciones.unshift({
       id: 'materiales', titulo: 'Materiales a comprar', cols: [['Material'], ['Cantidad', 'a'], ['Unidad']], filas: filasM,
@@ -628,6 +791,7 @@ const Elementos = (() => {
     for (const u of Object.values(mat.unidades)) resumen.push([u.t.replace(/\s*\(.*$/, '').replace(/ —.*$/, ''), `${num(u.n, 0)} un`]);
     if (mat.cemento) resumen.push(['Cemento', `${num(Math.ceil(mat.cemento / BULTO - 1e-9), 0)} bto`]);
     for (const t of mat.tejas || []) resumen.push(['Tejas', `${num(t.n, 0)} un`]);
+    if (mat.kgCubierta) resumen.push(['Perfilería cubierta', `${num(mat.kgCubierta, 0)} kg`]);
     return { secciones, avisos, resumen, mat };
   }
 
@@ -684,7 +848,8 @@ const Elementos = (() => {
 
   return {
     AREA, MAMPOSTERIA, TEJAS, CAPAS, PLANTILLAS, CFG, SISTEMAS, JUNTA, NOMBRE_TIPO, capa,
-    unidadesM2, morteroM2, espesorMuro,
+    PERFILES, CALIBRES, COLORES, perfilInfo, opcionesPerfil, opcionesMedida, opcionesCalibre, normalizarCubierta, datosCubierta,
+    unidadesM2, morteroM2, espesorMuro, extremosMuro, tramosLibres, geomCubierta, estructuraCubierta, cerchaGeom,
     dist, largo, angulo, proyectar, areaFirmada, caja, desfasar, recortar, rectangulo, franja,
     contexto, etiquetas, refuerzo, muroInfo, cubiertaInfo, planosCubierta, cantidades, detalleSVG, nuevoPlano,
   };

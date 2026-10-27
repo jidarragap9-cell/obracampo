@@ -1,8 +1,8 @@
 /* Almacenamiento local (IndexedDB). Todos los datos quedan en la tablet y funcionan sin internet. */
 const DB = (() => {
   const NOMBRE = 'obracampo';
-  const VERSION = 3;
-  const ALMACENES = ['proyectos', 'bitacora', 'fotos', 'cantidades', 'ajustes', 'insumos', 'apus', 'presupuestos', 'planos'];
+  const VERSION = 4;
+  const ALMACENES = ['proyectos', 'bitacora', 'fotos', 'cantidades', 'ajustes', 'insumos', 'apus', 'presupuestos', 'planos', 'banco', 'movimientos'];
   let conexion = null;
 
   function abrir() {
@@ -27,6 +27,9 @@ const DB = (() => {
         crear('presupuestos', 'proyectoId');
         // Versión 3: planos dibujados
         crear('planos', 'id', ['proyecto', 'proyectoId']);
+        // Versión 4: banco de materiales para atención de emergencias
+        crear('banco', 'id');
+        crear('movimientos', 'id');
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);

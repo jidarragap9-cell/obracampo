@@ -19,7 +19,7 @@
       if ('serviceWorker' in navigator) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
       // Refresca también la caché HTTP del navegador, que puede guardar archivos viejos unos minutos
       const archivos = ['index.html', 'sw.js', 'manifest.webmanifest', 'css/app.css', ...['db', 'ui', 'calc', 'bitacora', 'report', 'precios',
-        'presupuesto', 'elementos', 'iso', 'plano', 'contencion', 'app'].map(n => `js/${n}.js`)];
+        'presupuesto', 'elementos', 'vendor/three.min', 'iso', 'plano', 'contencion', 'banco', 'app'].map(n => `js/${n}.js`)];
       await Promise.allSettled(archivos.map(a => fetch(a, { cache: 'reload' })));
       location.replace('./index.html?act=' + Date.now());
     } catch (err) {

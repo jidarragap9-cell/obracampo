@@ -1,9 +1,9 @@
 /* Service worker: guarda la app en caché para que abra sin internet y se actualice en segundo plano. */
-const VERSION = 'obracampo-v4';
+const VERSION = 'obracampo-v5';
 const ARCHIVOS = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/db.js', 'js/ui.js', 'js/calc.js', 'js/bitacora.js', 'js/report.js', 'js/precios.js', 'js/presupuesto.js',
-  'js/elementos.js', 'js/iso.js', 'js/plano.js', 'js/contencion.js', 'js/app.js', 'icons/icon.svg',
+  'js/elementos.js', 'js/vendor/three.min.js', 'js/iso.js', 'js/plano.js', 'js/contencion.js', 'js/banco.js', 'js/app.js', 'icons/icon.svg',
 ];
 const OPCIONALES = ['icons/icon-192.png', 'icons/icon-512.png'];
 

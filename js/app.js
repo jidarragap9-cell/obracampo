@@ -30,17 +30,23 @@ const App = (() => {
     [/^#\/planos$/, () => Planos.lista(nuevaRaiz())],
     [/^#\/plano\/(\w+)$/, id => Planos.editor(nuevaRaiz(), id)],
     [/^#\/contencion$/, () => Contencion.vista(nuevaRaiz())],
+    [/^#\/banco\/?$/, () => { location.replace('#/banco/inventario'); }],
+    [/^#\/banco\/inventario$/, () => Banco.vistaInventario(nuevaRaiz())],
+    [/^#\/banco\/entregas$/, () => Banco.vistaMovimientos(nuevaRaiz(), 'entrega')],
+    [/^#\/banco\/entradas$/, () => Banco.vistaMovimientos(nuevaRaiz(), 'entrada')],
+    [/^#\/banco\/mov\/([\w-]+)$/, id => Banco.editor(nuevaRaiz(), id)],
   ];
 
   async function enrutar() {
     const h = location.hash || '#/';
     document.title = 'ObraCampo';
+    document.querySelectorAll('.modal-fondo').forEach(m => m.remove()); // las ventanas abiertas no sobreviven al cambio de vista
     for (const [re, fn] of rutas) {
       const m = h.match(re);
       if (!m) continue;
       const seccion = h.startsWith('#/calc') ? 'calc' : h.startsWith('#/ajustes') ? 'ajustes'
         : h.startsWith('#/precios') || h.startsWith('#/apu') ? 'precios'
-        : h.startsWith('#/plano') || h.startsWith('#/contencion') ? 'planos' : 'proyectos';
+        : h.startsWith('#/plano') || h.startsWith('#/contencion') ? 'planos' : h.startsWith('#/banco') ? 'banco' : 'proyectos';
       document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('activo', a.dataset.nav === seccion));
       window.scrollTo(0, 0);
       try { await fn(...m.slice(1)); }
@@ -200,11 +206,12 @@ const App = (() => {
     const a = {};
     for (const k of ['empresa', 'nit', 'profesional', 'matricula', 'logo']) a[k] = await DB.ajuste(k, '');
     const sello = await DB.ajuste('sello', true);
+    const tema = document.documentElement.dataset.tema || 'claro';
     const est = navigator.storage?.estimate ? await navigator.storage.estimate() : null;
     const persistente = navigator.storage?.persisted ? await navigator.storage.persisted() : false;
     raiz.innerHTML = `<div class="cabecera"><h1>Ajustes</h1><p class="sub">Estos datos aparecen en el encabezado y las firmas de los informes.</p></div>
       <section class="card"><h2>Empresa y profesional</h2><div class="grid g2">
-        <label class="campo"><span>Empresa / razón social</span><input data-k="empresa" value="${esc(a.empresa)}"></label>
+        <label class="campo"><span>Entidad o empresa (ej.: Alcaldía Municipal)</span><input data-k="empresa" value="${esc(a.empresa)}"></label>
         <label class="campo"><span>NIT</span><input data-k="nit" value="${esc(a.nit)}"></label>
         <label class="campo"><span>Ingeniero responsable</span><input data-k="profesional" value="${esc(a.profesional)}"></label>
         <label class="campo"><span>Matrícula profesional (COPNIA)</span><input data-k="matricula" value="${esc(a.matricula)}"></label>
@@ -213,6 +220,10 @@ const App = (() => {
           <label class="btn sm">Cambiar<input type="file" accept="image/*" hidden data-logo></label>${a.logo ? '<button class="btn sm peligro" data-quitar-logo>Quitar</button>' : ''}</div></div>
         <label class="campo check"><input type="checkbox" data-sello${sello ? ' checked' : ''}><span>Estampar fecha, hora y proyecto en las fotos</span></label>
       </div></section>
+      <section class="card"><h2>Apariencia</h2><div class="grid g2">
+        <label class="campo"><span>Tema de la app</span><select data-tema>${[['claro', 'Claro (recomendado)'], ['oscuro', 'Oscuro'], ['auto', 'Automático (según el sistema)']]
+          .map(([v, t]) => `<option value="${v}"${v === tema ? ' selected' : ''}>${t}</option>`).join('')}</select></label></div>
+        <p class="sub" style="margin-top:8px">El editor de planos siempre usa fondo claro para dibujar.</p></section>
       <section class="card"><h2>Copia de seguridad</h2>
         <p class="sub">Los datos viven solo en este dispositivo. Descargue una copia con frecuencia y guárdela en Drive o en el PC.</p>
         <div class="acciones"><button class="btn pri" data-exportar>⬇ Descargar copia (.json)</button>
@@ -231,6 +242,11 @@ const App = (() => {
     raiz.addEventListener('change', async ev => {
       const t = ev.target;
       if (t.matches('[data-sello]')) return DB.guardarAjuste('sello', t.checked);
+      if (t.matches('[data-tema]')) {
+        document.documentElement.dataset.tema = t.value;
+        try { localStorage.setItem('obracampo-tema', t.value); } catch { /* sin almacenamiento local */ }
+        return;
+      }
       if (t.matches('[data-logo]') && t.files[0]) {
         await DB.guardarAjuste('logo', await UI.comprimirImagen(t.files[0], { max: 600, calidad: 0.9 }));
         return vistaAjustes();
