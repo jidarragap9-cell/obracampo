@@ -1,5 +1,5 @@
 /* Service worker: guarda la app en caché para que abra sin internet y se actualice en segundo plano. */
-const VERSION = 'obracampo-v5';
+const VERSION = 'obracampo-v6';
 const ARCHIVOS = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/db.js', 'js/ui.js', 'js/calc.js', 'js/bitacora.js', 'js/report.js', 'js/precios.js', 'js/presupuesto.js',
@@ -22,14 +22,15 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 
+// Primero la red (para que una versión nueva nunca se mezcle con archivos viejos) y, sin conexión o si tarda, la copia guardada.
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(caches.open(VERSION).then(async cache => {
-    const enCache = await cache.match(e.request, { ignoreSearch: true });
     const clave = e.request.url.split(/[?#]/)[0];
-    const red = fetch(e.request, { cache: 'no-cache' })
-      .then(r => { if (r.ok) cache.put(clave, r.clone()); return r; })
-      .catch(() => enCache);
-    return enCache || red;
+    const enCache = await cache.match(e.request, { ignoreSearch: true });
+    const red = fetch(e.request, { cache: 'no-cache' }).then(r => { if (r.ok) cache.put(clave, r.clone()); return r; });
+    if (!enCache) return red;
+    const espera = new Promise(resolve => setTimeout(() => resolve(enCache), 4000));
+    return Promise.race([red.catch(() => enCache), espera]);
   }));
 });

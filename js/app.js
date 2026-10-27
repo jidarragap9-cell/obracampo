@@ -233,6 +233,7 @@ const App = (() => {
       <section class="card"><h2>Instalar en la tablet</h2><p class="sub">En Chrome abra el menú ⋮ y elija <b>Agregar a la pantalla principal</b> o <b>Instalar app</b>.
         Quedará como una aplicación más y funcionará sin conexión.</p></section>
       <section class="card"><h2>Actualizar la app</h2><p class="sub">Si después de publicar una versión nueva algo no abre, fuerce la actualización. Sus datos no se borran.</p>
+        <p class="sub">Versión instalada: <b>6</b> (editor flotante, 3D nuevo y banco de materiales).</p>
         <div class="acciones"><a class="btn" href="actualizar.html">⟳ Forzar actualización</a></div></section>`;
 
     raiz.addEventListener('input', ev => {
